@@ -1,0 +1,15 @@
+# .gitignore
+
+# 의존성 모듈 (제일 중요! 절대 올리면 안 됨)
+node_modules/
+dist/
+build/
+
+# 환경 변수 및 로그
+.env
+*.log
+.DS_Store
+
+# IDE 설정 파일 (선택)
+.vscode/
+.idea/
