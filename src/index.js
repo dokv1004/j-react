@@ -9,11 +9,14 @@ var __assign = (this && this.__assign) || function () {
     };
     return __assign.apply(this, arguments);
 };
-// -------------------- [1. 타입 정의] --------------------
+// 1. 전역 변수 및 타입 정의
 var wipRoot = null;
 var currentRoot = null;
 var deletions = [];
-// -------------------- [2. 엘리먼트 생성 함수] --------------------
+// Hooks를 위한 전역변수, 어떤 Fiber가 몇번째 훅을 호출했는지 추적
+var wipFiber = null; // 현재 작업 중인 Fiber
+var hookIndex = 0; // 현재 처리 중인 Hook의 순서
+// 2. 엘리먼트 생성 함수
 function createElement(type, props) {
     var children = [];
     for (var _i = 2; _i < arguments.length; _i++) {
@@ -35,7 +38,7 @@ function createTextElement(text) {
         },
     };
 }
-// -------------------- [3. DOM 조작 헬퍼 함수들 (위치 변경!)] --------------------
+// 3. DOM 조작 헬퍼 함수
 var isEvent = function (key) { return key.startsWith("on"); };
 var isProperty = function (key) { return key !== "children" && !isEvent(key); };
 var isNew = function (prev, next) { return function (key) {
@@ -43,7 +46,7 @@ var isNew = function (prev, next) { return function (key) {
 }; };
 var isGone = function (prev, next) { return function (key) { return !(key in next); }; };
 function updateDom(dom, prevProps, nextProps) {
-    // 1. 이벤트 제거
+    // 이벤트 파싱
     Object.keys(prevProps)
         .filter(isEvent)
         .filter(function (key) { return !(key in nextProps) || isNew(prevProps, nextProps)(key); })
@@ -51,21 +54,21 @@ function updateDom(dom, prevProps, nextProps) {
         var eventType = name.toLowerCase().substring(2);
         dom.removeEventListener(eventType, prevProps[name]);
     });
-    // 2. 속성 제거
+    // 속성 제거
     Object.keys(prevProps)
         .filter(isProperty)
         .filter(isGone(prevProps, nextProps))
         .forEach(function (name) {
         dom[name] = "";
     });
-    // 3. 속성 설정
+    // 속성 설정
     Object.keys(nextProps)
         .filter(isProperty)
         .filter(isNew(prevProps, nextProps))
         .forEach(function (name) {
         dom[name] = nextProps[name];
     });
-    // 4. 이벤트 추가
+    // 이벤트 추가
     Object.keys(nextProps)
         .filter(isEvent)
         .filter(isNew(prevProps, nextProps))
@@ -74,16 +77,15 @@ function updateDom(dom, prevProps, nextProps) {
         dom.addEventListener(eventType, nextProps[name]);
     });
 }
-// -------------------- [4. DOM 생성 함수 (수정됨!)] --------------------
+// 4. DOM 생성 함수
 function createDom(fiber) {
     var dom = fiber.type === "TEXT_ELEMENT"
         ? document.createTextNode("")
         : document.createElement(fiber.type);
-    // ✅ 수정된 부분: 이제 updateDom을 재사용해서 이벤트를 연결합니다!
     updateDom(dom, {}, fiber.props);
     return dom;
 }
-// -------------------- [5. 엔진 (Work Loop)] --------------------
+// 5. 엔진 (Work Loop)
 var nextUnitOfWork = null;
 function workLoop(deadline) {
     var shouldYield = false;
@@ -97,13 +99,13 @@ function workLoop(deadline) {
     requestIdleCallback(workLoop);
 }
 requestIdleCallback(workLoop);
-// -------------------- [6. 작업 수행 (Perform Unit Of Work)] --------------------
+// 6. 작업 수행 (Perform Unit Of Work)
 function performUnitOfWork(fiber) {
-    if (!fiber.dom) {
-        fiber.dom = createDom(fiber);
-    }
-    var elements = fiber.props.children;
-    reconcileChildren(fiber, elements);
+    // 함수형 컴포넌트 로직 분기
+    if (typeof fiber.type === "function")
+        updateFunctionComponent(fiber);
+    else
+        updateHostComponent(fiber);
     if (fiber.child) {
         return fiber.child;
     }
@@ -116,6 +118,21 @@ function performUnitOfWork(fiber) {
     }
     return null;
 }
+function updateFunctionComponent(fiber) {
+    wipFiber = fiber;
+    hookIndex = 0;
+    wipFiber.hooks = [];
+    var children = fiber.type(fiber.props);
+    reconcileChildren(fiber, [children]);
+}
+function updateHostComponent(fiber) {
+    if (!fiber.dom) {
+        fiber.dom = createDom(fiber);
+    }
+    var elements = fiber.props.children;
+    reconcileChildren(fiber, elements);
+}
+// 비교 로직
 function reconcileChildren(wipFiber, elements) {
     var _a;
     var index = 0;
@@ -164,7 +181,7 @@ function reconcileChildren(wipFiber, elements) {
         index++;
     }
 }
-// -------------------- [7. 렌더 & 커밋 함수] --------------------
+// 7. 렌더 & 커밋 함수
 function render(element, container) {
     wipRoot = {
         dom: container,
@@ -185,35 +202,86 @@ function commitRoot() {
     wipRoot = null;
 }
 function commitWork(fiber) {
-    var _a, _b;
+    var _a;
     if (!fiber)
         return;
-    var parentDom = (_a = fiber.parent) === null || _a === void 0 ? void 0 : _a.dom;
+    // 함수형 컴포넌트는 DOM이 없음
+    var parentFiber = fiber.parent;
+    while (parentFiber && !parentFiber.dom) {
+        parentFiber = parentFiber.parent;
+    }
+    if (!parentFiber)
+        return;
+    // parentFiber가 undefined면 멈춤 (루트보다 더 위로 가는 경우 방지)
+    var parentDom = parentFiber.dom;
     if (fiber.effectTag === "PLACEMENT" && fiber.dom && parentDom) {
         parentDom.appendChild(fiber.dom);
     }
     else if (fiber.effectTag === "UPDATE" && fiber.dom) {
-        updateDom(fiber.dom, (_b = fiber.alternate) === null || _b === void 0 ? void 0 : _b.props, fiber.props);
+        updateDom(fiber.dom, (_a = fiber.alternate) === null || _a === void 0 ? void 0 : _a.props, fiber.props);
     }
     else if (fiber.effectTag === "DELETION" && parentDom) {
-        if (fiber.dom)
-            parentDom.removeChild(fiber.dom);
+        commitDeletion(fiber, parentDom);
         return;
     }
     commitWork(fiber.child);
     commitWork(fiber.sibling);
 }
-// -------------------- [8. 실행 코드] --------------------
+// JReactHooks
+// useState
+function useState(initial) {
+    var _a, _b;
+    // 옵셔널 체이닝으로 이전에 Hook이 있는지 안전하게 찾음
+    var oldHook = (_b = (_a = wipFiber === null || wipFiber === void 0 ? void 0 : wipFiber.alternate) === null || _a === void 0 ? void 0 : _a.hooks) === null || _b === void 0 ? void 0 : _b[hookIndex];
+    var hook = {
+        state: oldHook ? oldHook.state : initial,
+        queue: [],
+    };
+    // 큐 처리
+    var actions = oldHook ? oldHook.queue : [];
+    actions.forEach(function (action) {
+        hook.state = typeof action === "function" ? action(hook.state) : action;
+    });
+    // 함수든 값이든 뭔가 들어오겠지...
+    var setState = function (action) {
+        hook.queue.push(action);
+        wipRoot = {
+            dom: currentRoot.dom,
+            props: currentRoot.props,
+            alternate: currentRoot,
+        };
+        nextUnitOfWork = wipRoot;
+        deletions = [];
+    };
+    wipFiber.hooks.push(hook);
+    hookIndex++;
+    return [hook.state, setState];
+}
+// 삭제 전용
+function commitDeletion(fiber, parentDom) {
+    if (fiber.dom) {
+        parentDom.removeChild(fiber.dom);
+    }
+    else {
+        if (fiber.child)
+            commitDeletion(fiber.child, parentDom);
+    }
+}
+// 8. 테스트 코드
+function Counter() {
+    var _a = useState(1), count = _a[0], setCount = _a[1];
+    var _b = useState("Apple"), text = _b[0], setText = _b[1];
+    return createElement("div", { style: "padding: 30px; background: #f0f0f0; border-radius: 10px;" }, createElement("h1", null, "Count: ".concat(count)), createElement("button", {
+        onclick: function () {
+            setCount(function (c) { return c + 1; });
+        },
+    }, "+1 증가 (Re-render Trigger)"), createElement("hr", null), createElement("h2", null, "".concat(text, " is delicious")), createElement("button", {
+        onclick: function () {
+            setText(function (t) { return (t === "Apple" ? "Banana" : "Apple"); });
+        },
+    }, "과일 바꾸기 (State 분리 테스트)"));
+}
 var container = document.getElementById("root");
-// 1. 초기 렌더링
-var element1 = createElement("div", { id: "foo", style: "background: #eee; padding: 20px;" }, createElement("h1", null, "Hello J-React! 👋"), createElement("p", null, "잠시 후 내용이 바뀝니다..."));
-if (container)
-    render(element1, container);
-// 2. 2초 뒤 업데이트
-setTimeout(function () {
-    var element2 = createElement("div", { id: "foo", style: "background: #ffcccc; padding: 20px;" }, createElement("h1", null, "Wow! It updated! 🚀"), createElement("p", { style: "color: blue" }, "화면이 깜빡이지 않고 부드럽게 변경되었어요."), 
-    // 버튼 클릭 이벤트 테스트!
-    createElement("button", { onClick: function () { return alert("성공! 🎉"); } }, "클릭해보세요"));
-    if (container)
-        render(element2, container);
-}, 2000);
+// 이제 함수형 컴포넌트(Counter)를 렌더링합니다!
+// createElement의 첫 번째 인자로 문자열("div")이 아니라 함수(Counter)가 들어갑니다.
+render(createElement(Counter, null), container);
