@@ -17,11 +17,11 @@ export function createElement(
   };
 }
 
-function createTextElement(text: string): JReactElement {
+function createTextElement(text: string | number): JReactElement {
   return {
     type: "TEXT_ELEMENT",
     props: {
-      nodeValue: text,
+      nodeValue: String(text),
       children: [],
     },
   };
