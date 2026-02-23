@@ -8,7 +8,7 @@ const isNew = (prev: any, next: any) => (key: string) =>
 const isGone = (prev: any, next: any) => (key: string) => !(key in next);
 
 export function updateDom(dom: Node, prevProps: any, nextProps: any) {
-  // 이벤트 파싱
+  // 이벤트 제거, 이벤트 중복 등록을 막기 위해 먼저 제거 후 나중에 추가
   Object.keys(prevProps)
     .filter(isEvent)
     .filter((key) => !(key in nextProps) || isNew(prevProps, nextProps)(key))
@@ -25,7 +25,7 @@ export function updateDom(dom: Node, prevProps: any, nextProps: any) {
       (dom as any)[name] = "";
     });
 
-  // 속성 설정
+  // 속성 추가
   Object.keys(nextProps)
     .filter(isProperty)
     .filter(isNew(prevProps, nextProps))

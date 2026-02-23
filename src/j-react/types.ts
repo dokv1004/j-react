@@ -11,6 +11,14 @@ export interface Hook {
   queue: any[]; // 상태 변경 요청을 담을 큐
 }
 
+export interface EffectHook {
+  tag: "effect";
+  effect: (() => void) | (() => () => void);
+  cleanup?: () => void;
+  deps?: any[];
+  prevDeps?: any[];
+}
+
 export interface Fiber {
   type?: any;
   dom?: Node;
