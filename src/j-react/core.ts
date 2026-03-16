@@ -260,3 +260,28 @@ export function useRef<T>(initial: T): { current: T } {
 
   return hook.state;
 }
+
+export function useEffect<T>(factory: () => T, deps: any[]): T {
+  // 1. 이전 Hook 찾기
+  const oldHook = wipFiber?.alternate?.hooks?.[hookIndex];
+
+  // 2. deps가 바뀌었는지 확인
+  const hasChanged = oldHook
+    ? deps.some((dep, i) => dep !== oldHook.deps![i])
+    : true;
+
+  const hook: Hook = {
+    tag: "memo",
+    // deps에 변화가 있으면 계산 실행
+    state: hasChanged ? factory() : oldHook.state,
+    // useMemo는 queue가 필요없음 (인터페이스를 맞추기 위해 빈 배열 줌)
+    queue: [],
+    deps,
+  };
+
+  // hook 공통 패턴, 현재 Fiber의 hooks 배열에 hook 추가 -> 다음 hook을 위해 index 증가
+  wipFiber!.hooks!.push(hook);
+  hookIndex++;
+
+  return hook.state;
+}
