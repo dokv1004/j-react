@@ -8,6 +8,9 @@ const isNew = (prev: any, next: any) => (key: string) =>
 const isGone = (prev: any, next: any) => (key: string) => !(key in next);
 
 export function updateDom(dom: Node, prevProps: any, nextProps: any) {
+  prevProps = prevProps || {};
+  nextProps = nextProps || {};
+
   // 이벤트 제거, 이벤트 중복 등록을 막기 위해 먼저 제거 후 나중에 추가
   Object.keys(prevProps)
     .filter(isEvent)

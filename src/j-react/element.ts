@@ -10,9 +10,12 @@ export function createElement(
     type,
     props: {
       ...props,
-      children: children.map((child) =>
-        typeof child === "object" ? child : createTextElement(child),
-      ),
+      children: children
+        .flat()
+        .filter((child) => child != null && child !== false && child !== true)
+        .map((child) =>
+          typeof child === "object" ? child : createTextElement(child),
+        ),
     },
   };
 }

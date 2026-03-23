@@ -4,35 +4,46 @@ import { JReactElement } from "./types";
 
 let listeners: (() => void)[] = [];
 
+// export function navigate(to: string) {
+//   console.log("🚗 navigate 호출:", to);
+//   // URL 변경
+//   window.history.pushState(null, "", to);
+//   console.log("🔔 listeners 개수:", listeners.length);
+//   // Router에게 알림
+//   listeners.forEach((listener) => listener());
+// }
+
 export function navigate(to: string) {
-  // URL 변경
+  console.log("navigate 호출:", to);
   window.history.pushState(null, "", to);
-  // Router에게 알림
+  console.log("listeners 개수:", listeners.length);
+  console.log("현재 URL:", window.location.pathname);
   listeners.forEach((listener) => listener());
 }
 
-export function Router(props: { children: JReactElement[] }) {
-  const [currentPath, setCurrentPath] = useState(window.location.pathname);
+export function Router(props: any) {
+  // const [currentPath, setCurrentPath] = useState(window.location.pathname);
+  const [, forceUpdate] = useState(0);
+  // console.log("Router 렌더링 - currentPath:", currentPath);
 
   useEffect(() => {
     const handlePopState = () => {
-      setCurrentPath(window.location.pathname);
+      forceUpdate((c: number) => c + 1);
     };
-
     window.addEventListener("popstate", handlePopState);
 
     const listener = () => {
-      setCurrentPath(window.location.pathname);
+      forceUpdate((c: number) => c + 1);
     };
     listeners.push(listener);
 
-    // 클린업
     return () => {
       window.removeEventListener("popstate", handlePopState);
       listeners = listeners.filter((l) => l !== listener);
     };
   }, []);
 
+  const currentPath = window.location.pathname;
   const children = props.children || [];
 
   for (let i = 0; i < children.length; i++) {

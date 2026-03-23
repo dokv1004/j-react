@@ -214,13 +214,15 @@ export function useState<T>(initial: T) {
   // 함수든 값이든 뭔가 들어오겠지...
   const setState = (action: any) => {
     hook.queue.push(action);
-    wipRoot = {
-      dom: currentRoot!.dom,
-      props: currentRoot!.props,
-      alternate: currentRoot,
-    };
-    nextUnitOfWork = wipRoot;
-    deletions = [];
+    if (!wipRoot) {
+      wipRoot = {
+        dom: currentRoot!.dom,
+        props: currentRoot!.props,
+        alternate: currentRoot,
+      };
+      nextUnitOfWork = wipRoot;
+      deletions = [];
+    }
   };
 
   wipFiber!.hooks!.push(hook);
@@ -252,6 +254,7 @@ export function useEffect(effect: () => void | (() => void), deps?: any[]) {
 export function useRef<T>(initial: T): { current: T } {
   const oldHook = wipFiber?.alternate?.hooks?.[hookIndex];
   const hook = {
+    tag: "ref",
     state: oldHook ? oldHook.state : { current: initial },
     queue: [],
   };
@@ -261,7 +264,7 @@ export function useRef<T>(initial: T): { current: T } {
   return hook.state;
 }
 
-export function useEffect<T>(factory: () => T, deps: any[]): T {
+export function useMemo<T>(factory: () => T, deps: any[]): T {
   // 1. 이전 Hook 찾기
   const oldHook = wipFiber?.alternate?.hooks?.[hookIndex];
 
@@ -273,7 +276,7 @@ export function useEffect<T>(factory: () => T, deps: any[]): T {
   const hook: Hook = {
     tag: "memo",
     // deps에 변화가 있으면 계산 실행
-    state: hasChanged ? factory() : oldHook.state,
+    state: hasChanged ? factory() : oldHook?.state,
     // useMemo는 queue가 필요없음 (인터페이스를 맞추기 위해 빈 배열 줌)
     queue: [],
     deps,

@@ -7,8 +7,10 @@ export interface JReactElement {
 }
 
 export interface Hook {
+  tag?: string;
   state: any; // 현재 상태
   queue: any[]; // 상태 변경 요청을 담을 큐
+  deps?: any[];
 }
 
 export interface EffectHook {

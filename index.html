@@ -4,9 +4,35 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>J-React Playground</title>
+    <style>
+      .board-row {
+        display: flex;
+      }
+      .square {
+        width: 60px;
+        height: 60px;
+        font-size: 24px;
+        font-weight: bold;
+        border: 1px solid #999;
+        background: #fff;
+        cursor: pointer;
+      }
+      .square:hover {
+        background: #eee;
+      }
+      .game {
+        display: flex;
+        gap: 20px;
+        padding: 20px;
+      }
+      .status {
+        margin-bottom: 10px;
+        font-weight: bold;
+      }
+    </style>
   </head>
   <body>
     <div id="root"></div>
-    <script type="module" src="/src/index.tsx"></script>
+    <script type="module" src="/src/index1.tsx"></script>
   </body>
 </html>
